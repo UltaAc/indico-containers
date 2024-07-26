@@ -26,8 +26,10 @@ jobs:
           platforms: linux/amd64,linux/arm64
           build-args: VERSION=${{ env.VERSION }}
           tags: |
-            ghcr.io/${{ secrets.GHCR_USERNAME }}/indico:${{ env.VERSION }}
+            ghcr.io/ultac/indico:${{ env.VERSION }}
+            ghcr.io/ultac/indico:latest
             getindico/indico:${{ env.VERSION }}
+            getindico/indico:latest
           outputs: type=oci,dest=/tmp/indico-image.tar
 
       - name: Test if Indico works 🧪
@@ -69,7 +71,8 @@ jobs:
 
       - name: Push Docker image 🚢
         run: |
-          docker push ghcr.io/${{ secrets.GHCR_USERNAME }}/indico:${{ env.VERSION }}
+          docker push ghcr.io/ultac/indico:${{ env.VERSION }}
+          docker push ghcr.io/ultac/indico:latest
 
   publish-dockerhub:
     name: Publish to Docker Hub 🚢
@@ -95,3 +98,4 @@ jobs:
       - name: Push Docker image 🚢
         run: |
           docker push getindico/indico:${{ env.VERSION }}
+          docker push getindico/indico:latest
