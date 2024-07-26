@@ -12,53 +12,35 @@ jobs:
       - uses: docker/setup-buildx-action@v3
         with:
           install: true
-          driver-opts: network=host
 
       - uses: actions/checkout@v4
 
       - name: Get version
         id: version
-        run: |
-          echo indico_version="${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
-          echo indico_version="${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-
-      - name: Extract metadata (tags, labels) for Docker 👀
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: |
-            ghcr.io/${{ secrets.GHCR_USERNAME }}/indico
-            getindico/indico
-          tags: |
-            type=semver,pattern={{version}},value=${{ steps.version.outputs.indico_version }}
-            type=semver,pattern={{major}}.{{minor}}.x,value=${{ steps.version.outputs.indico_version }}
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
 
       - name: Build Docker image 🚢
         uses: docker/build-push-action@v5
         with:
           context: indico/worker
           platforms: linux/amd64,linux/arm64
-          build-args: tag=${{ steps.version.outputs.indico_version }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          build-args: VERSION=${{ env.VERSION }}
+          tags: |
+            ghcr.io/${{ secrets.GHCR_USERNAME }}/indico:${{ env.VERSION }}
+            getindico/indico:${{ env.VERSION }}
           outputs: type=oci,dest=/tmp/indico-image.tar
 
       - name: Test if Indico works 🧪
         run: |
           docker load --input /tmp/indico-image.tar
           cp indico.env.sample indico.env
-          sed -i -E 's/image: getindico\/indico:latest/image: getindico\/indico:${indico_version}/' docker-compose.yml
+          sed -i -E 's/image: getindico\/indico:latest/image: getindico\/indico:${{ env.VERSION }}/' docker-compose.yml
           ./test.sh
 
-      - name: Get unique run id
-        id: unique_id
-        run: |
-          echo "cache_key=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> $GITHUB_OUTPUT
-
       - name: Upload build artifact 🔼
-        uses: actions/cache@v3
+        uses: actions/upload-artifact@v3
         with:
-          key: indico-image-${{ steps.unique_id.outputs.cache_key }}
+          name: indico-image
           path: /tmp/indico-image.tar
 
   publish-ghcr:
@@ -69,32 +51,25 @@ jobs:
     permissions:
       packages: write
     steps:
-      - name: Get unique run id
-        id: unique_id
-        run: |
-          echo "cache_key=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> $GITHUB_OUTPUT
-
       - name: Download build artifact 🔽
-        uses: actions/cache@v3
+        uses: actions/download-artifact@v3
         with:
-          key: indico-image-${{ steps.unique_id.outputs.cache_key }}
-          path: /tmp/indico-image.tar
+          name: indico-image
+          path: /tmp/
 
       - name: Import image
-        run: |
-          docker load --input /tmp/indico-image.tar
-          docker image ls -a | grep indico
+        run: docker load --input /tmp/indico-image.tar
 
       - name: Log in to GHCR 🔑
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ secrets.GHCR_USERNAME }}
+          password: ${{ secrets.GHCR_TOKEN }}
 
       - name: Push Docker image 🚢
         run: |
-          docker push --all-tags ghcr.io/${{ github.repository_owner }}/indico
+          docker push ghcr.io/${{ secrets.GHCR_USERNAME }}/indico:${{ env.VERSION }}
 
   publish-dockerhub:
     name: Publish to Docker Hub 🚢
@@ -102,21 +77,14 @@ jobs:
     runs-on: ubuntu-22.04
     environment: publish-dockerhub
     steps:
-      - name: Get unique run id
-        id: unique_id
-        run: |
-          echo "cache_key=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> $GITHUB_OUTPUT
-
       - name: Download build artifact 🔽
-        uses: actions/cache@v3
+        uses: actions/download-artifact@v3
         with:
-          key: indico-image-${{ steps.unique_id.outputs.cache_key }}
-          path: /tmp/indico-image.tar
+          name: indico-image
+          path: /tmp/
 
       - name: Import image
-        run: |
-          docker load --input /tmp/indico-image.tar
-          docker image ls -a | grep indico
+        run: docker load --input /tmp/indico-image.tar
 
       - name: Log in to Docker Hub 🔑
         uses: docker/login-action@v3
@@ -126,4 +94,4 @@ jobs:
 
       - name: Push Docker image 🚢
         run: |
-          docker push --all-tags getindico/indico
+          docker push getindico/indico:${{ env.VERSION }}
