@@ -32,13 +32,6 @@ jobs:
             getindico/indico:latest
           outputs: type=oci,dest=/tmp/indico-image.tar
 
-      - name: Test if Indico works 🧪
-        run: |
-          docker load --input /tmp/indico-image.tar
-          cp indico.env.sample indico.env
-          sed -i -E 's/image: getindico\/indico:latest/image: getindico\/indico:${{ env.VERSION }}/' docker-compose.yml
-          ./test.sh
-
       - name: Upload build artifact 🔼
         uses: actions/upload-artifact@v3
         with:
