@@ -9,7 +9,11 @@ jobs:
     name: Build Docker image
     runs-on: ubuntu-22.04
     steps:
-      - uses: docker/setup-buildx-action@v3.0.0
+      - uses: docker/setup-buildx-action@v3
+        with:
+          install: true
+          driver-opts: network=host
+
       - uses: actions/checkout@v4
 
       - name: Get version
@@ -20,7 +24,7 @@ jobs:
 
       - name: Extract metadata (tags, labels) for Docker 👀
         id: meta
-        uses: docker/metadata-action@v5.0.0
+        uses: docker/metadata-action@v5
         with:
           images: |
             ghcr.io/indico/indico
@@ -30,9 +34,10 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}.x,value=${{ steps.version.outputs.indico_version }}
 
       - name: Build Docker image 🚢
-        uses: docker/build-push-action@v5.0.0
+        uses: docker/build-push-action@v5
         with:
           context: indico/worker
+          platforms: linux/amd64,linux/arm64
           build-args: tag=${{ steps.version.outputs.indico_version }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -45,7 +50,6 @@ jobs:
           sed -i -E 's/image: getindico\/indico:latest/image: getindico\/indico:${indico_version}/' docker-compose.yml
           ./test.sh
 
-      # XXX Using the cache as a hack to workaround extremely slow artifact uploads (5 minutes+ for less than 1GB)
       - name: Get unique run id
         id: unique_id
         run: |
@@ -57,14 +61,6 @@ jobs:
           key: indico-image-${{ steps.unique_id.outputs.cache_key }}
           path: /tmp/indico-image.tar
 
-      # - name: Upload build artifact 🔼
-      #   uses: actions/upload-artifact@v3
-      #   with:
-      #     name: indico-image
-      #     retention-days: 1
-      #     path: /tmp/indico-image.tar
-
-
   publish-ghcr:
     name: Publish to GHCR 🐙
     needs: build
@@ -73,13 +69,6 @@ jobs:
     permissions:
       packages: write
     steps:
-      # - name: Download build artifact 🔽
-      #   uses: actions/download-artifact@v3
-      #   with:
-      #     name: indico-image
-      #     path: /tmp/
-
-      # XXX Using the cache as a hack to workaround extremely slow artifact uploads (5 minutes+ for less than 1GB)
       - name: Get unique run id
         id: unique_id
         run: |
@@ -97,7 +86,7 @@ jobs:
           docker image ls -a | grep indico
 
       - name: Log in to GHCR 🔑
-        uses: docker/login-action@v3.0.0
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -107,26 +96,12 @@ jobs:
         run: |
           docker push --all-tags ghcr.io/indico/indico
 
-      # - name: Delete build artifact 🗑
-      #   if: success() || failure()
-      #   uses: geekyeggo/delete-artifact@v2
-      #   with:
-      #     name: indico-image
-
-
   publish-dockerhub:
     name: Publish to Docker Hub 🚢
     needs: build
     runs-on: ubuntu-22.04
     environment: publish-dockerhub
     steps:
-      # - name: Download build artifact 🔽
-      #   uses: actions/download-artifact@v3
-      #   with:
-      #     name: indico-image
-      #     path: /tmp/
-
-      # XXX Using the cache as a hack to workaround extremely slow artifact uploads (5 minutes+ for less than 1GB)
       - name: Get unique run id
         id: unique_id
         run: |
@@ -144,7 +119,7 @@ jobs:
           docker image ls -a | grep indico
 
       - name: Log in to Docker Hub 🔑
-        uses: docker/login-action@v3.0.0
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
@@ -152,9 +127,3 @@ jobs:
       - name: Push Docker image 🚢
         run: |
           docker push --all-tags getindico/indico
-
-      # - name: Delete build artifact 🗑
-      #   if: success() || failure()
-      #   uses: geekyeggo/delete-artifact@v2
-      #   with:
-      #     name: indico-image
