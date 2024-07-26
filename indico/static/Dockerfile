@@ -8,7 +8,7 @@ RUN set -ex && \
 
 RUN set -ex && \
         mkdir /tmp/indico-pip && \
-        pip install -U pip setuptools && \
+        pip install -U pip setuptools --break-system-packages && \
         pip download --python-version 2.7 --no-deps -d /tmp/indico-pip indico && \
         unzip /tmp/indico-pip/indico-*.whl -d /srv/ 'indico/web/static/*' && \
         rm -rf /tmp/indico-pip
