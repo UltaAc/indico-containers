@@ -27,7 +27,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ghcr.io/${{ github.repository_owner }}/indico
+            ghcr.io/${{ secrets.GHCR_USERNAME }}/indico
             getindico/indico
           tags: |
             type=semver,pattern={{version}},value=${{ steps.version.outputs.indico_version }}
@@ -41,7 +41,7 @@ jobs:
           build-args: tag=${{ steps.version.outputs.indico_version }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          outputs: type=docker,dest=/tmp/indico-image.tar
+          outputs: type=oci,dest=/tmp/indico-image.tar
 
       - name: Test if Indico works 🧪
         run: |
